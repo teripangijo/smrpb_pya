@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static l10n %}
+
+{% block title %}Detail Barang: {{ barang.kode_barang }} - SMRPB{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'daftar_barang' %}">Daftar Barang BMN</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ barang.kode_barang }}</li>
+  </ol>
+</nav>
+
+<h2><i class="bi bi-info-circle-fill me-2"></i> Detail Barang BMN</h2>
+<hr>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                Informasi Barang
+            </div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Kode Barang:</strong> {{ barang.kode_barang }}</li>
+                <li class="list-group-item"><strong>Uraian Barang:</strong> {{ barang.uraian_barang }}</li>
+                <li class="list-group-item"><strong>NUP:</strong> {{ barang.nup }}</li>
+                <li class="list-group-item"><strong>Tahun Perolehan:</strong> {{ barang.tahun_perolehan }}</li>
+                <li class="list-group-item"><strong>Nilai Perolehan:</strong> Rp {{ barang.nilai_perolehan|floatformat:"2g" }}</li>
+                <li class="list-group-item"><strong>Masa Manfaat Standar:</strong> {{ barang.masa_manfaat_standar }} Tahun</li>
+                <li class="list-group-item"><strong>Nilai Buku (Akhir {{ tahun_sekarang }}):</strong> Rp {{ nilai_buku_saat_ini|floatformat:"2g" }}</li>
+            </ul>
+            <div class="card-footer">
+                 <a href="{% url 'edit_barang' barang.pk %}" class="btn btn-sm btn-warning">
+                     <i class="bi bi-pencil-fill me-1"></i> Edit Barang
+                 </a>
+                 <button class="btn btn-sm btn-danger"
+                         hx-delete="{% url 'hapus_barang' barang.pk %}"
+                         hx-target="body" {# Target body untuk redirect/refresh setelah delete dari detail #}
+                         hx-push-url="{% url 'daftar_barang' %}" {# Redirect ke daftar setelah delete #}
+                         hx-confirm="Anda yakin ingin menghapus barang {{ barang.kode_barang }} - {{ barang.uraian_barang }} (NUP: {{ barang.nup }})? Tindakan ini tidak bisa dibatalkan."
+                         title="Hapus Barang">
+                     <i class="bi bi-trash-fill me-1"></i> Hapus Barang
+                 </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+         <div class="card">
+             <div class="card-header">
+                 Estimasi Nilai Buku (Akhir Tahun)
+             </div>
+             <ul class="list-group list-group-flush">
+                 {% for tahun, nilai in nilai_buku_rencana.items %}
+                 <li class="list-group-item"><strong>Tahun {{ tahun }}:</strong> Rp {{ nilai|floatformat:"2g" }}</li>
+                 {% endfor %}
+             </ul>
+         </div>
+    </div>
+</div>
+
+
+<h3><i class="bi bi-calendar-check-fill me-2"></i> Rencana Pengelolaan ({{ tahun_rencana_list.0 }} - {{ tahun_rencana_list.3 }})</h3>
+<hr>
+
+{# Container untuk form tambah rencana (akan diisi oleh HTMX) #}
+<div id="form-tambah-rencana-container" class="mb-4 p-3 border rounded bg-light">
+    <form id="pilih-rencana-form"> {# Form pembungkus untuk selector awal #}
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label for="{{ pilih_rencana_form.tahun_rencana.id_for_label }}" class="form-label form-label-sm">Tahun Rencana:</label>
+                {{ pilih_rencana_form.tahun_rencana }} {# Pastikan variabel ini ada dari view #}
+            </div>
+            <div class="col-md-5">
+                 <label for="id_jenis_rencana_selector" class="form-label form-label-sm">Jenis Rencana:</label>
+                 <select name="jenis_rencana_selector" class="form-select form-select-sm" required id="id_jenis_rencana_selector"
+                         hx-get="{% url 'get_form_rencana_spesifik' pk=barang.pk %}"
+                         hx-include="[name='tahun_rencana']" {# Sertakan tahun #}
+                         hx-target="#form-rencana-spesifik-container"
+                         hx-swap="innerHTML"
+                         hx-trigger="change">
+                     {% for value, text in pilih_rencana_form.fields.jenis_rencana.choices %}
+                         <option value="{{ value }}">{{ text }}</option>
+                     {% endfor %}
+                 </select>
+            </div>
+             {# Container untuk form spesifik yang akan di-load oleh HTMX #}
+            <div class="col-md-12 mt-2" id="form-rencana-spesifik-container">
+                 <small class="text-muted">Pilih Tahun dan Jenis Rencana untuk melanjutkan.</small>
+            </div>
+        </div>
+    </form>
+</div>
+
+{# Container untuk tabel rencana (akan diupdate oleh HTMX) #}
+<h4>Daftar Rencana Tersimpan</h4>
+<div id="rencana-table-container">
+    {# Render tabel awal saat halaman dimuat #}
+    {% include 'rencana_bmn/_partials/tabel_rencana.html' %} {# Pastikan partial ini ada #}
+</div>
+
+{% endblock %}

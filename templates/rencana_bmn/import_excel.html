@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Impor Barang BMN dari Excel - SMRPB{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-file-earmark-spreadsheet-fill me-2"></i> Impor Data Barang BMN dari Excel (.xlsx)</h2>
+<hr>
+
+{# Menampilkan pesan sukses/error/info dari proses impor #}
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# Menampilkan error spesifik (misal header salah) #}
+{% if errors %}
+ <div class="alert alert-danger">
+     <strong>Error pada file:</strong>
+     <ul>
+         {% for error in errors %}
+         <li>{{ error }}</li>
+         {% endfor %}
+     </ul>
+ </div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-header">Instruksi Format File Excel</div>
+    <div class="card-body">
+        <ul>
+            <li>Gunakan file format <strong>.xlsx</strong>.</li>
+            <li>Baris pertama **wajib** berisi header kolom persis seperti berikut:
+                <ul>
+                    <li><code>Kode Barang</code></li>
+                    <li><code>Uraian Barang</code></li>
+                    <li><code>NUP</code></li>
+                    <li><code>Nilai Perolehan</code> (angka, tanpa format mata uang/pemisah ribuan)</li>
+                    <li><code>Tahun Perolehan</code> (angka tahun, misal: 2022)</li>
+                    <li><code>Masa Manfaat Standar</code> (angka tahun, misal: 10)</li>
+                </ul>
+            </li>
+            <li>Data barang dimulai dari baris kedua.</li>
+            <li>Pastikan semua kolom wajib (sesuai header di atas) terisi dan tipe datanya benar.</li>
+            <li>Barang dengan <strong>Kode Barang</strong> yang sama (sudah ada di sistem) akan <strong>dilewati (tidak diimpor ulang)</strong>.</li>
+            <li>Baris yang kosong akan dilewati.</li>
+        </ul>
+        {# Tambahkan link download template jika perlu #}
+        {# <a href="#" class="btn btn-sm btn-outline-secondary">Unduh Template Excel</a> #}
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data"> {# enctype penting untuk upload file #}
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="{{ form.excel_file.id_for_label }}" class="form-label">{{ form.excel_file.label }}</label>
+        {{ form.excel_file }}
+        {% if form.excel_file.errors %}
+            <div class="invalid-feedback d-block">
+                {% for error in form.excel_file.errors %} {{ error }} {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-upload me-1"></i> Unggah dan Impor File
+    </button>
+     <a href="{% url 'daftar_barang' %}" class="btn btn-secondary">
+         Kembali ke Daftar Barang
+    </a>
+</form>
+
+{# Tampilkan detail baris yang dilewati jika ada #}
+{% if skipped_rows %}
+<hr>
+<h4>Detail Baris yang Dilewati/Error (Total: {{ skipped_rows|length }})</h4>
+<div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+    <table class="table table-sm table-bordered table-warning">
+        <thead>
+            <tr>
+                <th>Baris Excel</th>
+                <th>Kode Barang</th>
+                <th>Alasan</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for skipped in skipped_rows %}
+            <tr>
+                <td>{{ skipped.row }}</td>
+                <td>{{ skipped.kode|default:'N/A' }}</td>
+                <td>{{ skipped.alasan }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

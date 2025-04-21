@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static l10n%}
+
+{% block title %}Daftar Barang BMN - SMRPB{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-archive-fill me-2"></i> Daftar Barang BMN</h2>
+    <div>
+        {# Tombol aksi bulk #}
+        <button type="button" class="btn btn-info disabled" id="btn-bulk-action"
+                hx-post="{% url 'get_bulk_rencana_form' %}" {# URL untuk load modal form #}
+                hx-target="#modal-placeholder" {# Target div modal #}
+                hx-swap="innerHTML"
+                hx-vals='js:{"selected_barang_ids": getSelectedIds()}' {# Kirim ID barang terpilih via hx-vals #}
+                data-bs-toggle="modal" data-bs-target="#bulkRencanaModal" {# Trigger Bootstrap modal #}
+                >
+            <i class="bi bi-pencil-square me-1"></i> Tetapkan Rencana Bulk (<span id="selected-count">0</span>) {# Tampilkan jumlah terpilih #}
+        </button>
+        <a href="{% url 'tambah_barang' %}" class="btn btn-primary ms-2">
+            <i class="bi bi-plus-circle-fill me-1"></i> Tambah Barang Baru
+        </a>
+    </div>
+</div>
+
+{# Menampilkan pesan sukses/error dari Django messages #}
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# Form Pencarian #}
+<form method="get" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="q" class="form-control" placeholder="Cari berdasarkan Kode atau Uraian Barang..." value="{{ query|default:'' }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i> Cari</button>
+         {% if query %}
+         <a href="{% url 'daftar_barang' %}" class="btn btn-outline-danger" title="Hapus Filter"><i class="bi bi-x-lg"></i></a>
+         {% endif %}
+    </div>
+</form>
+
+{# --- FORM UTAMA UNTUK MENAMPUNG CHECKBOX (tidak perlu submit langsung) --- #}
+<form id="daftar-barang-form">
+    {% csrf_token %} {# Tetap perlu jika ada aksi POST lain di halaman #}
+    {# Input hidden tidak diperlukan lagi jika pakai hx-vals='js:...' #}
+    {# <input type="hidden" name="selected_barang_ids" id="selected-barang-ids-input"> #}
+
+    {% if list_barang %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center" style="width: 1%;">
+                        <input class="form-check-input" type="checkbox" id="select-all-checkbox" title="Pilih Semua">
+                    </th>
+                    <th style="width: 1%;">No.</th>
+                    <th>Kode Barang</th>
+                    <th>Uraian Barang</th>
+                    <th class="text-center">NUP</th>
+                    <th class="text-center">Tahun Perolehan</th>
+                    <th>Nilai Perolehan</th>
+                    <th class="text-center">Masa Manfaat (Thn)</th>
+                    <th class="text-center">Aksi Individu</th>
+                </tr>
+            </thead>
+            <tbody id="barang-table-body"> {# ID untuk target HTMX delete #}
+                {% for barang in list_barang %}
+                <tr id="barang-row-{{ barang.pk }}"> {# ID unik per baris #}
+                    <td class="text-center">
+                        {# Checkbox untuk setiap barang #}
+                        <input class="form-check-input barang-checkbox" type="checkbox" name="barang_pk" value="{{ barang.pk }}">
+                    </td>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ barang.kode_barang }}</td>
+                    <td>{{ barang.uraian_barang }}</td>
+                    <td class="text-center">{{ barang.nup }}</td>
+                    <td class="text-center">{{ barang.tahun_perolehan }}</td>
+                    <td class="text-end">{{ barang.nilai_perolehan|floatformat:"2g"}}</td>
+                    <td class="text-center">{{ barang.masa_manfaat_standar }}</td>
+                    <td class="text-center">
+                        {# Aksi individu tetap ada #}
+                        <a href="{% url 'detail_barang' barang.pk %}" class="btn btn-sm btn-info" title="Lihat Detail & Rencana"><i class="bi bi-eye-fill"></i></a>
+                        <a href="{% url 'edit_barang' barang.pk %}" class="btn btn-sm btn-warning" title="Edit Barang"><i class="bi bi-pencil-fill"></i></a>
+                        <button type="button" class="btn btn-sm btn-danger"
+                                hx-delete="{% url 'hapus_barang' barang.pk %}"
+                                hx-target="#barang-row-{{ barang.pk }}" {# Target elemen TR untuk dihapus #}
+                                hx-swap="outerHTML" {# Ganti seluruh elemen TR #}
+                                hx-confirm="Anda yakin ingin menghapus barang {{ barang.kode_barang }} - {{ barang.uraian_barang }} (NUP: {{ barang.nup }})?"
+                                title="Hapus Barang">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-warning" role="alert">
+        Tidak ada data Barang BMN yang ditemukan.{% if query %} Untuk pencarian "{{ query }}".{% endif %}
+        {% if not query %}
+            <a href="{% url 'tambah_barang' %}" class="alert-link"> Tambahkan barang baru?</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</form> {# --- AKHIR FORM UTAMA --- #}
+
+{# Placeholder untuk Modal Bootstrap #}
+<div class="modal fade" id="bulkRencanaModal" tabindex="-1" aria-labelledby="bulkRencanaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg"> {# Buat modal lebih besar jika perlu #}
+    <div class="modal-content">
+      {# Konten modal akan di-load oleh HTMX ke sini #}
+       <div id="modal-placeholder">
+            {# Konten awal loading #}
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="bulkRencanaModalLabel">Memuat Form...</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+       </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Fungsi untuk mendapatkan ID terpilih (digunakan oleh hx-vals)
+    function getSelectedIds() {
+        const selectedCheckboxes = document.querySelectorAll('.barang-checkbox:checked');
+        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+        return selectedIds.join(','); // Kirim sebagai string dipisah koma
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const barangCheckboxes = document.querySelectorAll('.barang-checkbox');
+        const bulkActionButton = document.getElementById('btn-bulk-action');
+        const selectedCountSpan = document.getElementById('selected-count');
+        // const selectedIdsInput = document.getElementById('selected-barang-ids-input'); // Tidak dipakai lagi
+
+        function updateBulkButtonState() {
+            const selectedCheckboxes = document.querySelectorAll('.barang-checkbox:checked');
+            const count = selectedCheckboxes.length;
+            selectedCountSpan.textContent = count; // Update jumlah terpilih di tombol
+
+            if (count > 0) {
+                bulkActionButton.classList.remove('disabled');
+                // selectedIdsInput.value = getSelectedIds(); // Tidak perlu isi input hidden lagi
+            } else {
+                bulkActionButton.classList.add('disabled');
+                // selectedIdsInput.value = ''; // Tidak perlu isi input hidden lagi
+            }
+            // Proses ulang tombol agar htmx tahu state bisa berubah (tdk selalu perlu)
+            htmx.process(bulkActionButton);
+        }
+
+        // Event listener untuk checkbox "Pilih Semua"
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                barangCheckboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                updateBulkButtonState();
+            });
+        }
+
+        // Event listener untuk checkbox barang individual
+        barangCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (!checkbox.checked) {
+                    selectAllCheckbox.checked = false;
+                } else {
+                    const allChecked = Array.from(barangCheckboxes).every(cb => cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                }
+                updateBulkButtonState();
+            });
+        });
+
+        // Panggil sekali saat load untuk set state awal tombol
+        updateBulkButtonState();
+
+        // Optional: Reset form saat modal ditutup
+        const bulkModalElement = document.getElementById('bulkRencanaModal');
+        bulkModalElement.addEventListener('hidden.bs.modal', event => {
+          document.getElementById('modal-placeholder').innerHTML = `
+            <div class="modal-header"><h1 class="modal-title fs-5">Memuat Form...</h1><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
+        });
+
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{# Template ini digunakan untuk merender tabel rencana #}
+{% load static %} {# Muat static jika perlu icon/etc #}
+
+{# Tampilkan pesan dari proses tambah/hapus rencana #}
+{% if messages %}
+    <div id="rencana-messages-placeholder"> {# Placeholder agar pesan muncul di sini #}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show alert-sm" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+    </div>
+{% endif %}
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Tahun</th>
+                <th>Jenis Rencana</th>
+                <th>Detail</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rencana in all_rencana %} {# Pastikan variabel all_rencana ada dari view #}
+            <tr id="rencana-row-{{ rencana.pk }}-{{ rencana.jenis_rencana_slug }}"> {# Gunakan slug untuk ID #}
+                <td>{{ rencana.tahun_rencana }}</td>
+                <td>{{ rencana.jenis_rencana_display }}</td>
+                <td>
+                   {# Menampilkan detail berdasarkan jenis #}
+                   {% if rencana.jenis_rencana_display == 'Penggunaan' %}
+                       {{ rencana.get_jenis_penggunaan_display }}
+                   {% elif rencana.jenis_rencana_display == 'Pemanfaatan' %}
+                       {{ rencana.get_jenis_pemanfaatan_display }}
+                   {% elif rencana.jenis_rencana_display == 'Pemindahtanganan' %}
+                       {{ rencana.get_jenis_pemindahtanganan_display }}
+                   {% elif rencana.jenis_rencana_display == 'Penghapusan' %}
+                       {{ rencana.get_jenis_penghapusan_display }}
+                       {% if rencana.jenis_penghapusan == 'SEBAB_LAIN' and rencana.keterangan_sebab_lain %}
+                           ({{ rencana.keterangan_sebab_lain|truncatechars:30 }})
+                       {% endif %}
+                   {% else %}
+                       -
+                   {% endif %}
+                </td>
+                <td>
+                    {# Tombol Hapus Rencana #}
+                     <button class="btn btn-danger btn-sm"
+                            hx-delete="{% url 'hapus_rencana' pk=barang.pk rencana_id=rencana.pk jenis_rencana_slug=rencana.jenis_rencana_slug %}"
+                            hx-target="#rencana-table-container" {# Target container tabel untuk di-update #}
+                            hx-swap="innerHTML" {# Ganti seluruh isi container tabel #}
+                            hx-confirm="Anda yakin ingin menghapus rencana {{ rencana.jenis_rencana_display }} tahun {{ rencana.tahun_rencana }} ini?"
+                            title="Hapus Rencana">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">Belum ada data rencana untuk tahun {{ tahun_rencana_list.0 }}-{{ tahun_rencana_list.3 }}.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,77 @@
+{# Template ini akan dirender oleh view get_form_rencana_spesifik #}
+{% if form_spesifik %}
+<form hx-post="{{ form_action_url }}" {# Pastikan form_action_url ada dari view #}
+      hx-target="#rencana-table-container" {# Target container tabel untuk di-update #}
+      hx-swap="innerHTML" {# Ganti seluruh isi container tabel #}
+      >
+    {% csrf_token %}
+    {# Kirim tahun dan jenis sebagai hidden input untuk view POST #}
+    <input type="hidden" name="tahun_rencana" value="{{ tahun_rencana }}"> {# Pastikan tahun_rencana ada dari view #}
+    {# Input hidden untuk identifikasi form (opsional jika deteksi dari prefix field) #}
+    {# <input type="hidden" name="form_prefix" value="{{ form_spesifik.prefix }}"> #}
+
+    {# Div untuk menampilkan pesan error dari server #}
+    <div id="form-rencana-messages" class="mb-2"></div>
+
+    {# Render field dari form spesifik #}
+    {% for field in form_spesifik %}
+        <div class="mb-2"> {# mb-2 lebih kecil untuk form dalam modal/area kecil #}
+            <label for="{{ field.id_for_label }}" class="form-label form-label-sm">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+                <div class="form-text form-text-sm">{{ field.help_text }}</div>
+            {% endif %}
+            {% if field.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in field.errors %} {{ error }} {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-success btn-sm mt-2">
+        <i class="bi bi-check-circle-fill me-1"></i> Simpan Rencana {{ jenis_rencana|title }} {# Pastikan jenis_rencana ada dari view #}
+    </button>
+</form>
+{% else %}
+    {# Jika form None (misal jenis belum dipilih atau tidak valid) #}
+    {# Bisa tampilkan pesan atau biarkan kosong #}
+{% endif %}
+
+{# Script sederhana untuk handle is-invalid class #}
+<script>
+    (function() {
+        // Cari form terdekat sebelum script ini dieksekusi
+        const formElement = document.currentScript.previousElementSibling;
+        if (formElement && formElement.tagName === 'FORM') {
+             formElement.querySelectorAll('.invalid-feedback').forEach(function(errorElement) {
+                const fieldContainer = errorElement.closest('.mb-2');
+                if (fieldContainer) {
+                    const inputElement = fieldContainer.querySelector('input, select, textarea');
+                    if (inputElement && !inputElement.classList.contains('is-invalid')) {
+                        inputElement.classList.add('is-invalid');
+                    }
+                }
+            });
+
+            // Jika form Penghapusan, handle visibilitas keterangan
+            const jenisPenghapusanSelect = formElement.querySelector('select[name$="-jenis_penghapusan"]'); // Cari select jenis penghapusan
+            const keteranganDiv = formElement.querySelector('textarea[name$="-keterangan_sebab_lain"]')?.closest('.mb-2');
+
+            function toggleKeterangan() {
+                if (jenisPenghapusanSelect && keteranganDiv) {
+                    if (jenisPenghapusanSelect.value === 'SEBAB_LAIN') {
+                        keteranganDiv.style.display = '';
+                    } else {
+                        keteranganDiv.style.display = 'none';
+                    }
+                }
+            }
+
+            if (jenisPenghapusanSelect && keteranganDiv) {
+                toggleKeterangan(); // Initial check
+                jenisPenghapusanSelect.addEventListener('change', toggleKeterangan);
+            }
+        }
+    })();
+</script>

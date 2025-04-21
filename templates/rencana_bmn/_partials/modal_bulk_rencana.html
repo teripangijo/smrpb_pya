@@ -1,0 +1,149 @@
+{% comment %} templates/rencana_bmn/_partials/modal_bulk_rencana.html {% endcomment %}
+{% load static %}
+
+<form action="{% url 'proses_bulk_rencana' %}" method="post"
+      hx-post="{% url 'proses_bulk_rencana' %}" {# Trigger POST via HTMX #}
+      hx-target="#modal-placeholder" {# Target konten modal ini lagi #}
+      hx-swap="innerHTML" {# Ganti seluruh isi modal jika error/sukses re-render #}
+>
+    {% csrf_token %}
+    {# Kirim ID barang terpilih yg didapat dari view get_bulk_rencana_form #}
+    <input type="hidden" name="selected_barang_ids" value="{{ selected_ids_str }}">
+
+    <div class="modal-header">
+        <h1 class="modal-title fs-5" id="bulkRencanaModalLabel">Tetapkan Rencana Bulk</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+         {# Div untuk menampilkan pesan error form dari re-render via HTMX #}
+        <div id="bulk-form-messages">
+             {% if form.non_field_errors %}
+                <div class="alert alert-danger alert-sm py-1">
+                    {% for error in form.non_field_errors %} {{ error }} {% endfor %}
+                </div>
+            {% endif %}
+            {# Django messages juga bisa ditampilkan di sini jika perlu #}
+            {% if messages %}
+                {% for message in messages %}
+                    {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR or message.level == DEFAULT_MESSAGE_LEVELS.WARNING %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show alert-sm py-1" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <p>Anda akan menerapkan rencana berikut ke <strong>{{ selected_ids_count }}</strong> barang BMN terpilih.</p>
+        <hr>
+
+        {# Render Form BulkRencanaForm #}
+        <div class="mb-3">
+            <label for="{{ form.tahun_rencana.id_for_label }}" class="form-label">{{ form.tahun_rencana.label }}</label>
+            {{ form.tahun_rencana }}
+            {% if form.tahun_rencana.errors %}
+                <div class="invalid-feedback d-block">{% for error in form.tahun_rencana.errors %} {{ error }} {% endfor %}</div>
+             {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="{{ form.jenis_rencana.id_for_label }}" class="form-label">{{ form.jenis_rencana.label }}</label>
+            {{ form.jenis_rencana }}
+             {% if form.jenis_rencana.errors %}
+                <div class="invalid-feedback d-block">{% for error in form.jenis_rencana.errors %} {{ error }} {% endfor %}</div>
+             {% endif %}
+        </div>
+
+        <hr>
+        {# Detail Spesifik - Tampil/Sembunyi berdasarkan jenis_rencana #}
+        <div id="bulk-detail-fields">
+            {% for field in form %}
+                {% if field.name != 'tahun_rencana' and field.name != 'jenis_rencana' %}
+                 {# Gunakan atribut data_jenis dari widget form #}
+                 <div class="mb-3 detail-field-wrapper" data_jenis_wrapper="{{ field.field.widget.attrs.data_jenis }}" style="display: none;"> {# Mulai tersembunyi #}
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }} {# Render widget field #}
+                     {% if field.errors %}
+                        <div class="invalid-feedback d-block">{% for error in field.errors %} {{ error }} {% endfor %}</div>
+                     {% endif %}
+                </div>
+                {% endif %}
+            {% empty %}
+                 <p class="text-danger">Error: Tidak ada field yang ditemukan dalam form.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary">
+             <i class="bi bi-check-circle-fill me-1"></i> Terapkan Rencana
+        </button>
+    </div>
+</form>
+
+{# Script untuk handle show/hide detail field #}
+<script>
+(function() {
+    // Pastikan script ini tidak error jika elemen tidak ditemukan
+    const jenisSelect = document.getElementById('id_bulk_jenis_rencana');
+    const detailWrappers = document.querySelectorAll('.detail-field-wrapper');
+    const keteranganWrapper = document.querySelector('textarea[name$="-keterangan_sebab_lain"]')?.closest('.detail-field-wrapper');
+    const jenisPenghapusanSelect = document.querySelector('select.detail-field[data_jenis_wrapper="PENGHAPUSAN"]');
+
+    function toggleDetailFields() {
+        if (!jenisSelect) return; // Keluar jika select utama tidak ada
+
+        const selectedJenis = jenisSelect.value;
+        detailWrappers.forEach(wrapper => {
+            if (!wrapper) return; // Lewati jika wrapper null
+
+            const wrapperJenis = wrapper.getAttribute('data_jenis_wrapper');
+            if (wrapperJenis === selectedJenis) {
+                // Kasus khusus untuk field keterangan pada jenis Penghapusan
+                if (wrapper === keteranganWrapper) {
+                    if (jenisPenghapusanSelect && jenisPenghapusanSelect.value === 'SEBAB_LAIN') {
+                         wrapper.style.display = 'block';
+                    } else {
+                         wrapper.style.display = 'none';
+                    }
+                } else {
+                     wrapper.style.display = 'block'; // Tampilkan wrapper utama
+                }
+            } else {
+                wrapper.style.display = 'none'; // Sembunyikan yang lain
+            }
+        });
+    }
+
+    // Listener untuk select utama
+    if (jenisSelect) {
+        jenisSelect.addEventListener('change', toggleDetailFields);
+    }
+
+     // Listener tambahan untuk select jenis penghapusan (jika ada)
+    if (jenisPenghapusanSelect) {
+         jenisPenghapusanSelect.addEventListener('change', toggleDetailFields);
+    }
+
+    // Panggil sekali saat modal siap (mungkin perlu sedikit delay atau event lain jika HTMX swap butuh waktu)
+    // setTimeout(toggleDetailFields, 0); // Coba panggil setelah render cycle berikutnya
+    toggleDetailFields(); // Panggil langsung saat script dieksekusi
+
+    // Tambahkan is-invalid class jika ada error (sama seperti form lain)
+    const formElement = document.currentScript?.closest('form'); // Lebih aman
+     if (formElement) {
+        formElement.querySelectorAll('.invalid-feedback').forEach(function(errorElement) {
+            if (!errorElement) return;
+            const fieldContainer = errorElement.closest('.mb-3');
+            if (fieldContainer) {
+                const inputElement = fieldContainer.querySelector('input, select, textarea');
+                 if (inputElement && !inputElement.classList.contains('is-invalid')) {
+                    inputElement.classList.add('is-invalid');
+                 }
+            }
+        });
+    }
+
+})();
+</script>

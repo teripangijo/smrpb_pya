@@ -1,0 +1,69 @@
+# .gitignore - Files and directories to ignore for the SMRPB project
+
+# Environment variables
+.env
+*.env
+
+# Python virtual environment
+venv/
+env/
+ENV/
+*.venv
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django collected static files (jika dijalankan lokal)
+staticfiles_collected/
+
+# Django media files (jika ada upload file pengguna)
+media/
+
+# Log files
+*.log
+logs/
+
+# Database files (jika menggunakan SQLite untuk development awal)
+*.sqlite3
+db.sqlite3
+*.sql
+
+# Editor/IDE specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+nbproject/
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+htmlcov/ # Coverage reports
+.coverage*
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# File hasil kompilasi atau sementara lainnya
+*.out
+*.pid
+*.pid.lock
+*.seed
+
+# Node modules (jika Anda menambahkan frontend build process)
+# node_modules/
+# npm-debug.log*
+# yarn-debug.log*
+# yarn-error.log*
+# package-lock.json # (tergantung preferensi tim)
+# yarn.lock # (tergantung preferensi tim)

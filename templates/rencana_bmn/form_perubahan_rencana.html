@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - SMRPB{% endblock %} {# Pastikan page_title ada dari view #}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'daftar_semua_rencana' %}">Perubahan Rencana</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Ajukan Perubahan</li>
+  </ol>
+</nav>
+
+{# Pastikan variabel jenis_rencana_display dan rencana ada dari view #}
+<h2>{{ page_title }}: {{ jenis_rencana_display }} Tahun {{ rencana.tahun_rencana }}</h2>
+<hr>
+<p>
+    {# Pastikan variabel barang ada dari view #}
+    <strong>Barang:</strong> {{ barang.kode_barang }} - {{ barang.uraian_barang }} (NUP: {{ barang.nup }}) <br>
+    <strong>Rencana Saat Ini:</strong>
+    {# Tampilkan detail spesifik rencana saat ini #}
+    {% if jenis_rencana_display == 'Penggunaan' %} {{ rencana.get_jenis_penggunaan_display }}
+    {% elif jenis_rencana_display == 'Pemanfaatan' %} {{ rencana.get_jenis_pemanfaatan_display }}
+    {% elif jenis_rencana_display == 'Pemindahtanganan' %} {{ rencana.get_jenis_pemindahtanganan_display }}
+    {% elif jenis_rencana_display == 'Penghapusan' %}
+        {{ rencana.get_jenis_penghapusan_display }}
+        {% if rencana.jenis_penghapusan == 'SEBAB_LAIN' and rencana.keterangan_sebab_lain %} ({{ rencana.keterangan_sebab_lain }}) {% endif %}
+    {% else %} - {% endif %}
+</p>
+
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    {# Menampilkan error non-field dari kedua form #}
+    {% if rencana_form.non_field_errors or alasan_form.non_field_errors %}
+        <div class="alert alert-danger">
+             {% for error in rencana_form.non_field_errors %} {{ error }} {% endfor %}
+             {% for error in alasan_form.non_field_errors %} {{ error }} {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Menampilkan pesan jika ada (misal error integrity atau error umum dari view) #}
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR or message.level == DEFAULT_MESSAGE_LEVELS.WARNING %}
+             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+
+    <h4>Detail Rencana Baru</h4>
+    {# Loop melalui field form RENCANA SPESIFIK #}
+    {# Pastikan rencana_form ada dari view #}
+    {% for field in rencana_form %}
+        <div class="mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }} {# Render widget field biasa #}
+            {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+            {% endif %}
+            {% if field.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in field.errors %} {{ error }} {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    <hr>
+    <h4>Alasan Perubahan</h4>
+     {# Field form ALASAN #}
+     {# Pastikan alasan_form ada dari view #}
+     <div class="mb-3">
+        <label for="{{ alasan_form.alasan.id_for_label }}" class="form-label">{{ alasan_form.alasan.label }} <span class="text-danger">*</span></label>
+        {{ alasan_form.alasan }}
+        {% if alasan_form.alasan.help_text %}
+            <div class="form-text">{{ alasan_form.alasan.help_text }}</div>
+        {% endif %}
+        {% if alasan_form.alasan.errors %}
+            <div class="invalid-feedback d-block">
+                {% for error in alasan_form.alasan.errors %} {{ error }} {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save-fill me-1"></i> Simpan Perubahan
+        </button>
+        <a href="{% url 'daftar_semua_rencana' %}" class="btn btn-secondary">
+             Batal
+        </a>
+    </div>
+</form>
+
+{# Script untuk handle is-invalid (sama seperti di form_barang.html) #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        form.querySelectorAll('.invalid-feedback').forEach(function(errorElement) {
+            const fieldContainer = errorElement.closest('.mb-3');
+            if (fieldContainer) {
+                const inputElement = fieldContainer.querySelector('input, select, textarea');
+                if (inputElement && !inputElement.classList.contains('is-invalid')) { // Cek agar tidak double add
+                    inputElement.classList.add('is-invalid');
+                }
+            }
+        });
+         // Handle visibilitas keterangan penghapusan jika ada formnya
+         const jenisPenghapusanSelect = form.querySelector('select[name$="-jenis_penghapusan"]'); // Cari berdasarkan akhiran nama
+         const keteranganDiv = form.querySelector('textarea[name$="-keterangan_sebab_lain"]')?.closest('.mb-3'); // Cari berdasarkan akhiran nama
+
+         function toggleKeterangan() {
+             if (jenisPenghapusanSelect && keteranganDiv) {
+                if (jenisPenghapusanSelect.value === 'SEBAB_LAIN') {
+                    keteranganDiv.style.display = '';
+                } else {
+                    keteranganDiv.style.display = 'none';
+                }
+             }
+         }
+         if (jenisPenghapusanSelect && keteranganDiv) {
+            toggleKeterangan(); // Initial check
+            jenisPenghapusanSelect.addEventListener('change', toggleKeterangan);
+         }
+    });
+</script>
+
+{% endblock %}

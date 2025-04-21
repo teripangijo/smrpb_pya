@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% load static humanize %} {# Humanize opsional untuk format angka #}
+
+{% block title %}Beranda - SMRPB{% endblock %}
+
+{% block content %}
+{# Bagian Judul dan Tombol Utama #}
+<div class="px-4 py-5 my-5 text-center">
+    {# Pastikan nama_aplikasi ada dari context view #}
+    <h1 class="display-5 fw-bold">{{ nama_aplikasi|default:"SMRPB" }}</h1>
+    <div class="col-lg-6 mx-auto">
+        <p class="lead mb-4">Selamat datang di aplikasi pengelolaan rencana Barang Milik Negara. Silakan gunakan menu navigasi di atas untuk memulai.</p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <a href="{% url 'daftar_barang' %}" class="btn btn-primary btn-lg px-4 gap-3">Lihat Daftar Barang</a>
+            <a href="{% url 'daftar_semua_rencana' %}" class="btn btn-outline-secondary btn-lg px-4">Lihat Semua Rencana</a>
+        </div>
+    </div>
+</div>
+
+{# Bagian Kartu Ringkasan #}
+<div class="row mt-4 text-center">
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column justify-content-between"> {# Tambah flexbox untuk tata letak #}
+                <div>
+                    <h5 class="card-title">Total Barang BMN</h5>
+                    {# Pastikan total_barang ada dari context view #}
+                    <p class="card-text display-6">{{ total_barang|default:"N/A" }}</p>
+                </div>
+                <a href="{% url 'daftar_barang' %}" class="btn btn-sm btn-outline-primary mt-2">Lihat Detail</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+             <div class="card-body d-flex flex-column justify-content-between"> {# Tambah flexbox #}
+                <div>
+                    {# Pastikan tahun_sekarang dan total_rencana_aktif ada dari context #}
+                    <h5 class="card-title">Total Rencana Aktif ({{ tahun_sekarang|default:"Tahun Ini" }})</h5>
+                    <p class="card-text display-6">{{ total_rencana_aktif|default:"N/A" }}</p>
+                </div>
+                 <a href="{% url 'daftar_semua_rencana' %}" class="btn btn-sm btn-outline-primary mt-2">Lihat Detail</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+             <div class="card-body d-flex flex-column justify-content-between"> {# Tambah flexbox #}
+                <div>
+                    <h5 class="card-title">Aktivitas Terakhir</h5>
+                    {# Pastikan perubahan_terakhir ada dari context #}
+                    {% if perubahan_terakhir %}
+                        <p class="card-text text-start"> {# Buat rata kiri agar lebih rapi #}
+                           <strong>{{ perubahan_terakhir.get_aksi_display }}</strong><br>
+                           <small>Pada: {{ perubahan_terakhir.tanggal_aksi|date:"d M Y H:i" }}</small><br>
+                           <small>Oleh: {{ perubahan_terakhir.user|default:"System" }}</small><br>
+                           {# Cek apakah objek rencana masih ada sebelum coba akses #}
+                           {% with perubahan_terakhir.rencana_object as rencana_lama %}
+                             {% if rencana_lama %}
+                                <small>Objek: {{ rencana_lama.barang.kode_barang }} - {{ perubahan_terakhir.content_type.name|capfirst }} {{ rencana_lama.tahun_rencana }}</small><br>
+                             {% else %}
+                                 <small>Objek: (Data Rencana Asli Mungkin Dihapus)</small><br>
+                             {% endif %}
+                           {% endwith %}
+                           <small>Alasan: {{ perubahan_terakhir.alasan|truncatechars:50 }}</small>
+                        </p>
+                    {% else %}
+                        <p class="card-text text-muted">Belum ada aktivitas perubahan/pembatalan tercatat.</p>
+                    {% endif %}
+                </div>
+                 {# Mungkin link ke halaman log jika ada #}
+                 {# <a href="#" class="btn btn-sm btn-outline-secondary mt-2">Lihat Log</a> #}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
