@@ -591,3 +591,140 @@ def proses_bulk_rencana(request):
         messages.error(request, "Data form tidak valid, silakan periksa kembali.")
         context = {'form': form, 'selected_ids_str': selected_ids_str, 'selected_ids_count': selected_ids_count}
         return render(request, 'rencana_bmn/_partials/modal_bulk_rencana.html', context)
+    
+@login_required
+def import_rencana_excel(request):
+    """Menampilkan form unggah dan memproses impor data RENCANA dari Excel."""
+    # Variabel untuk hasil proses, didefinisikan di luar if
+    skipped_rows = []
+    errors = []
+    imported_count = 0
+    form = None # Inisialisasi form
+
+    if request.method == 'POST':
+        # Buat form dengan data POST dan file
+        form = ImportExcelForm(request.POST, request.FILES)
+        if form.is_valid():
+            excel_file = request.FILES['excel_file']
+            # Reset hasil untuk proses baru
+            imported_count = 0
+            skipped_rows = []
+            errors = []
+
+            # Mapping dari teks Excel ke Model dan field detailnya
+            RENCANA_MAP = {
+                'penggunaan': (RencanaPenggunaan, 'jenis_penggunaan'),
+                'pemanfaatan': (RencanaPemanfaatan, 'jenis_pemanfaatan'),
+                'pemindahtanganan': (RencanaPemindahtanganan, 'jenis_pemindahtanganan'),
+                'penghapusan': (RencanaPenghapusan, 'jenis_penghapusan'),
+            }
+            DETAIL_MAP = {
+                'penggunaan': {'digunakan sendiri': 'SENDIRI', 'digunakan pihak lain': 'PIHAK_LAIN'},
+                'pemanfaatan': {'sewa': 'SEWA', 'pinjam pakai': 'PINJAM_PAKAI', 'bgs/bsg': 'BGS_BSG', 'ketupi': 'KETUPI'},
+                'pemindahtanganan': {'penjualan dengan lelang': 'LELANG', 'hibah': 'HIBAH', 'tukar menukar': 'TUKAR_MENUKAR'},
+                'penghapusan': {'penjualan dengan lelang': 'LELANG', 'hibah': 'HIBAH', 'tukar menukar': 'TUKAR_MENUKAR', 'sebab lain': 'SEBAB_LAIN'},
+            }
+
+            try:
+                with transaction.atomic():
+                    workbook = openpyxl.load_workbook(excel_file, data_only=True)
+                    sheet = workbook.active
+                    header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value is not None]
+                    expected_headers = ['kode barang', 'nup', 'tahun rencana', 'jenis rencana utama', 'detail spesifik'] # Header minimal
+                    expected_headers_full = expected_headers + ['keterangan'] # Header lengkap
+
+                    if not all(h in header for h in expected_headers):
+                         errors.append(f"Format header Excel tidak sesuai. Pastikan minimal ada kolom: {', '.join(expected_headers)}")
+                         raise ValueError("Header tidak sesuai")
+
+                    col_indices = {h: idx for idx, h in enumerate(header)}
+
+                    for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+                        if not any(row[:len(expected_headers)]): continue # Lewati baris kosong berdasarkan kolom wajib
+
+                        # Gunakan dictionary agar lebih mudah pass ke error log
+                        row_data = {h: (str(row[idx]).strip() if row[idx] is not None else None) for h, idx in col_indices.items() if idx < len(row)}
+
+                        try:
+                            kode_barang = row_data.get('kode barang')
+                            nup_val = row_data.get('nup')
+                            tahun_rencana_val = row_data.get('tahun rencana')
+                            jenis_utama_str = row_data.get('jenis rencana utama', '').lower()
+                            detail_spesifik_str = row_data.get('detail spesifik', '').lower()
+                            keterangan_val = row_data.get('keterangan')
+
+                            if not all([kode_barang, nup_val is not None, tahun_rencana_val is not None, jenis_utama_str, detail_spesifik_str]):
+                                raise ValueError("Data wajib (Kode Barang, NUP, Thn Rencana, Jenis Utama, Detail) tidak lengkap")
+
+                            try:
+                                nup = int(nup_val)
+                                tahun_rencana = int(tahun_rencana_val)
+                                if tahun_rencana < timezone.now().year:
+                                    raise ValueError(f"Thn Rencana ({tahun_rencana}) < thn ini.")
+                            except (ValueError, TypeError):
+                                 raise ValueError("NUP atau Tahun Rencana harus angka.")
+
+                            try:
+                                barang = BarangBMN.objects.get(kode_barang=kode_barang, nup=nup)
+                                if tahun_rencana < barang.tahun_perolehan:
+                                     raise ValueError(f"Thn Rencana ({tahun_rencana}) < Thn Perolehan ({barang.tahun_perolehan}).")
+                            except BarangBMN.DoesNotExist:
+                                raise ValueError(f"Barang Kode {kode_barang} NUP {nup} tidak ditemukan.")
+
+                            if jenis_utama_str not in RENCANA_MAP:
+                                raise ValueError(f"Jenis Rencana Utama '{row_data.get('jenis rencana utama')}' tidak dikenal.")
+
+                            ModelRencana, detail_field = RENCANA_MAP[jenis_utama_str]
+                            detail_map = DETAIL_MAP.get(jenis_utama_str, {})
+                            if detail_spesifik_str not in detail_map:
+                                 raise ValueError(f"Detail Spesifik '{row_data.get('detail spesifik')}' tidak valid untuk Jenis '{jenis_utama_str.capitalize()}'.")
+                            detail_value = detail_map[detail_spesifik_str]
+
+                            if jenis_utama_str == 'penghapusan' and detail_value == 'SEBAB_LAIN' and not keterangan_val:
+                                 raise ValueError("Keterangan wajib diisi untuk Penghapusan Sebab Lain.")
+
+                            defaults_data = {detail_field: detail_value}
+                            if jenis_utama_str == 'penghapusan' and detail_value == 'SEBAB_LAIN':
+                                defaults_data['keterangan_sebab_lain'] = keterangan_val
+
+                            rencana, created = ModelRencana.objects.get_or_create(
+                                barang=barang, tahun_rencana=tahun_rencana, defaults=defaults_data
+                            )
+
+                            if created:
+                                imported_count += 1
+                                if jenis_utama_str == 'pemindahtanganan':
+                                     jenis_hps = detail_value
+                                     hps, created_hps = RencanaPenghapusan.objects.get_or_create(
+                                        barang=barang, tahun_rencana=tahun_rencana, defaults={'jenis_penghapusan': jenis_hps})
+                                     if not created_hps and hps.jenis_penghapusan != jenis_hps:
+                                         hps.jenis_penghapusan=jenis_hps; hps.keterangan_sebab_lain=None; hps.save()
+                            else:
+                                skipped_rows.append({'row': row_idx, 'kode': kode_barang, 'nup': nup, 'tahun': tahun_rencana, 'jenis': jenis_utama_str.capitalize(), 'alasan': 'Rencana sudah ada.'})
+
+                        except (ValueError, TypeError) as e_val:
+                            skipped_rows.append({'row': row_idx, 'kode': row_data.get('kode barang'), 'nup': row_data.get('nup'), 'tahun': row_data.get('tahun rencana'), 'jenis': row_data.get('jenis rencana utama'), 'alasan': f'Error: {e_val}'})
+                        except IntegrityError as e_int:
+                            skipped_rows.append({'row': row_idx, 'kode': row_data.get('kode barang'), 'nup': row_data.get('nup'), 'tahun': row_data.get('tahun rencana'), 'jenis': row_data.get('jenis rencana utama'), 'alasan': f'Database Error: {e_int}'})
+
+                if imported_count > 0: messages.success(request, f"Berhasil mengimpor {imported_count} data Rencana Pengelolaan baru.")
+                if skipped_rows: messages.warning(request, f"{len(skipped_rows)} baris dilewati karena rencana sudah ada atau terjadi error.")
+                if not errors and imported_count == 0 and not skipped_rows: messages.info(request, "Tidak ada data rencana baru yang diimpor dari file.")
+
+            except ValueError as e_header: messages.error(request, f"Gagal memproses file: {e_header}")
+            except Exception as e: messages.error(request, f"Terjadi kesalahan saat memproses file Excel: {e}")
+
+        else: # Form POST tapi tidak valid (misal tidak ada file)
+            messages.error(request, "Form tidak valid. Pastikan Anda memilih file Excel yang benar.")
+            # Biarkan form yang tidak valid ditampilkan kembali dengan error bawaannya
+    else: # GET request
+        form = ImportExcelForm() # Buat form kosong untuk ditampilkan
+
+    # Siapkan context untuk render template (selalu dieksekusi)
+    context = {
+        'form': form, # Kirim form (kosong atau yg tidak valid)
+        'skipped_rows': skipped_rows, # Kirim hasil proses jika ada
+        'errors': errors,
+        'imported_count': imported_count
+    }
+    return render(request, 'rencana_bmn/import_rencana_excel.html', context)

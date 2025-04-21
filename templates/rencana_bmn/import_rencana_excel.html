@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Impor Rencana Pengelolaan dari Excel - SMRPB{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-file-earmark-spreadsheet-fill me-2"></i> Impor Data Rencana Pengelolaan dari Excel (.xlsx)</h2>
+<hr>
+
+{# Menampilkan pesan sukses/error/info dari proses impor #}
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# Menampilkan error spesifik (misal header salah) #}
+{% if errors %}
+ <div class="alert alert-danger">
+     <strong>Error pada file:</strong>
+     <ul>
+         {% for error in errors %}
+         <li>{{ error }}</li>
+         {% endfor %}
+     </ul>
+ </div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-header">Instruksi Format File Excel</div>
+    <div class="card-body">
+        <p>Gunakan file format <strong>.xlsx</strong>. Baris pertama **wajib** berisi header kolom (nama tidak case-sensitive, urutan bisa beda kecuali 6 kolom pertama penting):</p>
+        <ol>
+            <li><code>Kode Barang</code> (Wajib - Harus sudah ada di database)</li>
+            <li><code>NUP</code> (Wajib - Harus sudah ada di database)</li>
+            <li><code>Tahun Rencana</code> (Wajib - Angka tahun, misal: 2025)</li>
+            <li><code>Jenis Rencana Utama</code> (Wajib - Teks: Penggunaan, Pemanfaatan, Pemindahtanganan, atau Penghapusan)</li>
+            <li><code>Detail Spesifik</code> (Wajib - Teks sesuai jenis utama, misal: Sewa, Hibah, Digunakan Sendiri, Sebab Lain)</li>
+            <li><code>Keterangan</code> (Opsional - Hanya diisi jika Jenis=Penghapusan dan Detail=Sebab Lain)</li>
+        </ol>
+        <p><strong>Nilai Valid untuk Detail Spesifik:</strong></p>
+        <ul>
+            <li><strong>Penggunaan:</strong> Digunakan Sendiri, Digunakan Pihak Lain</li>
+            <li><strong>Pemanfaatan:</strong> Sewa, Pinjam Pakai, BGS/BSG, KETUPI</li>
+            <li><strong>Pemindahtanganan:</strong> Penjualan dengan Lelang, Hibah, Tukar Menukar</li>
+            <li><strong>Penghapusan:</strong> Sebab Lain (atau jenis pemindahtanganan jika ingin eksplisit, tapi akan otomatis jika Pemindahtanganan diimpor)</li>
+        </ul>
+        <p><strong>Penting:</strong></p>
+        <ul>
+            <li>Data dimulai dari baris kedua.</li>
+            <li>Barang BMN (kombinasi Kode Barang & NUP) **harus sudah ada** di database.</li>
+            <li>Jika Rencana Pengelolaan untuk Barang dan Tahun yang sama **sudah ada**, baris tersebut akan **dilewati**.</li>
+            <li>Pastikan format Tahun Rencana benar (angka) dan tidak sebelum tahun ini atau sebelum tahun perolehan barang.</li>
+        </ul>
+        {# <a href="#" class="btn btn-sm btn-outline-secondary">Unduh Template Excel Rencana</a> #}
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data"> {# enctype penting #}
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="{{ form.excel_file.id_for_label }}" class="form-label">{{ form.excel_file.label }}</label>
+        {{ form.excel_file }}
+        {% if form.excel_file.errors %}
+            <div class="invalid-feedback d-block">
+                {% for error in form.excel_file.errors %} {{ error }} {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-upload me-1"></i> Unggah dan Impor File Rencana
+    </button>
+     <a href="{% url 'daftar_barang' %}" class="btn btn-secondary">
+         Kembali ke Daftar Barang
+    </a>
+</form>
+
+{# Tampilkan detail baris yang dilewati jika ada #}
+{% if skipped_rows %}
+<hr>
+<h4>Detail Baris yang Dilewati/Error (Total: {{ skipped_rows|length }})</h4>
+<div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+    <table class="table table-sm table-bordered table-warning">
+        <thead>
+            <tr>
+                <th>Baris Excel</th>
+                <th>Kode Barang</th>
+                <th>NUP</th>
+                <th>Tahun</th>
+                <th>Jenis</th>
+                <th>Alasan</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for skipped in skipped_rows %}
+            <tr>
+                <td>{{ skipped.row }}</td>
+                <td>{{ skipped.kode|default:'N/A' }}</td>
+                <td>{{ skipped.nup|default:'N/A' }}</td>
+                <td>{{ skipped.tahun|default:'N/A' }}</td>
+                <td>{{ skipped.jenis|default:'N/A' }}</td>
+                <td>{{ skipped.alasan }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

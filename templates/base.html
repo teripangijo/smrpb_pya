@@ -10,78 +10,88 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <link rel="stylesheet" href="{% static 'css/style.css' %}"> {# Kita akan buat file ini nanti jika perlu #}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'index' %}">SMRPB</a>
+            {# Jika Beranda dilindungi login, arahkan ke sana hanya jika login, jika tidak mungkin ke login? #}
+            {# Atau biarkan saja, toh akan redirect jika belum login #}
+            <a class="navbar-brand fw-bold" href="{% url 'index' %}">SMRPB</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    {# Tampilkan Beranda hanya jika sudah login (karena view index dilindungi) #}
+                    {# Tampilkan menu utama hanya jika user sudah login #}
                     {% if user.is_authenticated %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" aria-current="page" href="{% url 'index' %}">Beranda</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'barang' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'daftar_barang' %}">Daftar Barang BMN</a>
+                            {# Logika active bisa diperbaiki agar lebih akurat #}
+                            <a class="nav-link {% if request.resolver_match.url_name == 'daftar_barang' or request.resolver_match.url_name == 'tambah_barang' or request.resolver_match.url_name == 'edit_barang' or request.resolver_match.url_name == 'detail_barang' %}active{% endif %}" href="{% url 'daftar_barang' %}">Daftar Barang BMN</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'rencana' in request.resolver_match.url_name and 'perubahan' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'daftar_semua_rencana' %}">Perubahan Rencana</a>
+                            <a class="nav-link {% if 'perubahan' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'daftar_semua_rencana' %}">Perubahan Rencana</a>
                         </li>
-                        <li class="nav-item dropdown">
+                        <li class="nav-item dropdown {% if 'export' in request.resolver_match.url_name %}active{% endif %}">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Laporan & Ekspor
                             </a>
                             <ul class="dropdown-menu">
-                                {# URL Laporan (jika ada nanti) #}
-                                {# <li><a class="dropdown-item" href="#">Lihat Laporan Penggunaan</a></li> ... #}
+                                {# <li><h6 class="dropdown-header">Laporan</h6></li> #}
+                                {# <li><a class="dropdown-item" href="#">Rencana Penggunaan</a></li> ... #}
                                 {# <li><hr class="dropdown-divider"></li> #}
-
-                                {# --- LINK EKSPOR CSV --- #}
-                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=penggunaan">
-                                    <i class="bi bi-download me-2"></i>Ekspor Rencana Penggunaan (CSV)
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=pemanfaatan">
-                                    <i class="bi bi-download me-2"></i>Ekspor Rencana Pemanfaatan (CSV)
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=pemindahtanganan">
-                                     <i class="bi bi-download me-2"></i>Ekspor Rencana Pemindahtanganan (CSV)
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=penghapusan">
-                                     <i class="bi bi-download me-2"></i>Ekspor Rencana Penghapusan (CSV)
-                                </a></li>
+                                <li><h6 class="dropdown-header">Ekspor CSV</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=penggunaan"><i class="bi bi-download me-2"></i>Penggunaan</a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=pemanfaatan"><i class="bi bi-download me-2"></i>Pemanfaatan</a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=pemindahtanganan"><i class="bi bi-download me-2"></i>Pemindahtanganan</a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=penghapusan"><i class="bi bi-download me-2"></i>Penghapusan</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=semua">
-                                     <i class="bi bi-download me-2"></i>Ekspor Semua Rencana (CSV)
-                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_rencana_csv' %}?tipe=semua"><i class="bi bi-download me-2"></i>Semua Rencana</a></li>
+                            </ul>
+                        </li>
+                        {# Dropdown untuk Impor Excel #}
+                        <li class="nav-item dropdown {% if 'import' in request.resolver_match.url_name %}active{% endif %}">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Impor Excel
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'import_barang_excel' %}active{% endif %}"
+                                       href="{% url 'import_barang_excel' %}">
+                                        <i class="bi bi-archive-fill me-2"></i>Impor Barang BMN
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'import_rencana_excel' %}active{% endif %}"
+                                       href="{% url 'import_rencana_excel' %}">
+                                        <i class="bi bi-calendar-check-fill me-2"></i>Impor Rencana
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'import_barang_excel' %}active{% endif %}" href="{% url 'import_barang_excel' %}">Impor Excel</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'admin:index' %}" target="_blank">Admin Area</a>
+                            <a class="nav-link" href="{% url 'admin:index' %}" target="_blank" title="Buka Antarmuka Admin Django">Admin Area</a>
                         </li>
                     {% endif %} {# Akhir dari blok menu user terautentikasi #}
                 </ul>
                 <span class="navbar-text">
                     {% if user.is_authenticated %}
                         Halo, {{ user.username }}!
-                        {# --- GANTI LINK LOGOUT DENGAN FORM INI --- #}
+                        {# Form Logout (POST Request) #}
                         <form action="{% url 'logout' %}" method="post" class="d-inline ms-2">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-light" style="border: none; background: none; padding: 0; vertical-align: baseline;">
+                            <button type="submit" class="btn btn-sm btn-outline-light" style="border: none; background: none; padding: 0; vertical-align: baseline;" title="Keluar dari aplikasi">
                                 Logout
                             </button>
                         </form>
-                        {# --- AKHIR FORM LOGOUT --- #}
                     {% else %}
+                        {# Tombol Login hanya muncul jika tidak ada menu lain #}
+                        {# Atau jika halaman Beranda publik, link login bisa selalu ada #}
                         <a href="{% url 'login' %}" class="btn btn-sm btn-outline-light">Login</a>
                     {% endif %}
                 </span>
@@ -102,13 +112,19 @@
 
     <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
 
+    {# Custom JS (jika Anda membuatnya) #}
     {# <script src="{% static 'js/script.js' %}"></script> #}
 
     <script>
-        // Menambahkan header CSRF token untuk request AJAX HTMX
+        // Menambahkan header CSRF token untuk request AJAX HTMX (Penting!)
         document.body.addEventListener('htmx:configRequest', (event) => {
             event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-        })
+        });
+
+        // Inisialisasi tooltip Bootstrap jika ada (opsional)
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"], [title]');
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+
     </script>
 
     {% block extra_scripts %}{% endblock %}

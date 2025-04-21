@@ -40,4 +40,5 @@ urlpatterns = [
     path('barang/import/excel/', views.import_barang_excel, name='import_barang_excel'),
     path('rencana/bulk/get-form/', views.get_bulk_rencana_form, name='get_bulk_rencana_form'),
     path('rencana/bulk/proses/', views.proses_bulk_rencana, name='proses_bulk_rencana'),
+    path('rencana/import/excel/', views.import_rencana_excel, name='import_rencana_excel'),
 ]
