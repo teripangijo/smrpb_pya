@@ -17,7 +17,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key-for-dev') # De
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True' # Read DEBUG from .env
 
-ALLOWED_HOSTS = ['*'] # Adjust for production
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') # Adjust for production
 
 
 # Application definition
@@ -75,12 +75,8 @@ WSGI_APPLICATION = 'smrpb_project.wsgi.application'
 # dan user 'pengguna_db_smrpb' dengan password 'password_rahasia_db'
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -124,7 +120,7 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
-# STATIC_ROOT = BASE_DIR / "staticfiles_collected" # Aktifkan ini untuk production (collectstatic)
+STATIC_ROOT = BASE_DIR / "staticfiles_collected" # Aktifkan ini untuk production (collectstatic)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
