@@ -33,6 +33,8 @@ from .forms import (
     RencanaPemindahtangananForm, RencanaPenghapusanForm, AlasanForm,
     ImportExcelForm, BulkRencanaForm
 )
+from types import SimpleNamespace
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
 # === View Dasar ===
@@ -327,55 +329,135 @@ def hapus_rencana(request, pk, rencana_id, jenis_rencana_slug):
 # === Views untuk Perubahan Rencana ===
 @login_required
 def daftar_semua_rencana(request):
-    print("--- VIEW daftar_semua_rencana DIPANGGIL ---")
-    penggunaan = RencanaPenggunaan.objects.select_related('barang').all()
-    pemanfaatan = RencanaPemanfaatan.objects.select_related('barang').all()
-    pemindahtanganan = RencanaPemindahtanganan.objects.select_related('barang').all()
-    penghapusan = RencanaPenghapusan.objects.select_related('barang').all()
-    # -- DEBUG PRINT 1 --
-    print(f"Jumlah Awal: Penggunaan={penggunaan.count()}, Pemanfaatan={pemanfaatan.count()}, Pemindahtanganan={pemindahtanganan.count()}, Penghapusan={penghapusan.count()}")
+    """Menampilkan daftar semua rencana dengan filter"""
+    # -- Ambil Filter -- #
+    tahun_filter = request.GET.get('tahun', '')
+    jenis_filter = request.GET.get('jenis', '')
 
+    # -- Siapkan Opsi Filter untuk Template --
+    tahun_sekarang = timezone.now().year
+    tahun_options = [('', 'Semua Tahun')] + [(str(t), str(t)) for t in range(tahun_sekarang, tahun_sekarang + 4)]
+    jenis_options = [
+        ('', 'Semua Jenis'),
+        ('Penggunaan', 'Penggunaan'),
+        ('Pemanfaatan', 'Pemanfaatan'),
+        ('Pemindahtanganan', 'Pemindahtanganan'),
+        ('Penghapusan', 'Penghapusan'),
+    ]
+
+    # -- Ambil data awal --
+    model_list_map = {
+        'Penggunaan': RencanaPenggunaan,
+        'Pemanfaatan': RencanaPemanfaatan,
+        'Pemindahtanganan': RencanaPemindahtanganan,
+        'Penghapusan': RencanaPenghapusan,
+    }
     all_rencana = []
-    ct_penggunaan = ContentType.objects.get_for_model(RencanaPenggunaan)
-    ct_pemanfaatan = ContentType.objects.get_for_model(RencanaPemanfaatan)
-    ct_pemindahtanganan = ContentType.objects.get_for_model(RencanaPemindahtanganan)
-    ct_penghapusan = ContentType.objects.get_for_model(RencanaPenghapusan)
+    content_types = {model.__name__: ContentType.objects.get_for_model(model) for model in model_list_map.values()}
 
-    # Loop Penggunaan
-    for item in penggunaan:
-        try: # Tambah try-except untuk debug error per item
-            item.jenis_rencana_display = "Penggunaan"; item.jenis_rencana_slug = "penggunaan"; item.detail_spesifik = item.get_jenis_penggunaan_display(); item.content_type_id = ct_penggunaan.id; all_rencana.append(item)
-        except Exception as e: print(f"Error di loop Penggunaan: {e} pada item {item.pk}")
-    # -- DEBUG PRINT 2 --
-    print(f"Jumlah setelah Penggunaan: {len(all_rencana)}")
+    # --- Terapkan Filter ---
+    for jenis_nama, ModelRencana in model_list_map.items():
+        # Filter berdasarkan Jenis
+        if not jenis_filter or jenis_filter == jenis_nama:
+            qs = ModelRencana.objects.select_related('barang')
+            # Filter berdasarkan Tahun
+            if tahun_filter:
+                try:
+                    qs = qs.filter(tahun_rencana=int(tahun_filter))
+                except ValueError:
+                    pass # Abaikan jika tahun filter tidak valid
 
-    # Loop Pemanfaatan
-    for item in pemanfaatan:
-        try:
-            item.jenis_rencana_display = "Pemanfaatan"; item.jenis_rencana_slug = "pemanfaatan"; item.detail_spesifik = item.get_jenis_pemanfaatan_display(); item.content_type_id = ct_pemanfaatan.id; all_rencana.append(item)
-        except Exception as e: print(f"Error di loop Pemanfaatan: {e} pada item {item.pk}")
-    # -- DEBUG PRINT 3 --
-    print(f"Jumlah setelah Pemanfaatan: {len(all_rencana)}")
+            # Ambil data & tambahkan atribut display
+            for item in qs.all(): # Ambil semua setelah filter
+                item.jenis_rencana_display = jenis_nama
+                item.jenis_rencana_slug = jenis_nama.lower()
+                item.content_type_id = content_types[ModelRencana.__name__].id
+                # Set detail spesifik (logika sama seperti sebelumnya)
+                if isinstance(item, RencanaPenggunaan): item.detail_spesifik = item.get_jenis_penggunaan_display()
+                elif isinstance(item, RencanaPemanfaatan): item.detail_spesifik = item.get_jenis_pemanfaatan_display()
+                elif isinstance(item, RencanaPemindahtanganan): item.detail_spesifik = item.get_jenis_pemindahtanganan_display()
+                elif isinstance(item, RencanaPenghapusan):
+                    detail = item.get_jenis_penghapusan_display();
+                    if item.jenis_penghapusan == 'SEBAB_LAIN' and item.keterangan_sebab_lain: detail += f" ({item.keterangan_sebab_lain})"
+                    item.detail_spesifik = detail
+                else: item.detail_spesifik = "-"
+                all_rencana.append(item)
 
-    # Loop Pemindahtanganan
-    for item in pemindahtanganan:
-        try:
-            item.jenis_rencana_display = "Pemindahtanganan"; item.jenis_rencana_slug = "pemindahtanganan"; item.detail_spesifik = item.get_jenis_pemindahtanganan_display(); item.content_type_id = ct_pemindahtanganan.id; all_rencana.append(item)
-        except Exception as e: print(f"Error di loop Pemindahtanganan: {e} pada item {item.pk}")
-    # -- DEBUG PRINT 4 --
-    print(f"Jumlah setelah Pemindahtanganan: {len(all_rencana)}")
-
-    # Loop Penghapusan
-    for item in penghapusan:
-         try:
-            item.jenis_rencana_display = "Penghapusan"; item.jenis_rencana_slug = "penghapusan"; detail = item.get_jenis_penghapusan_display(); item.detail_spesifik = detail + (f" ({item.keterangan_sebab_lain})" if item.jenis_penghapusan == 'SEBAB_LAIN' and item.keterangan_sebab_lain else ""); item.content_type_id = ct_penghapusan.id; all_rencana.append(item)
-         except Exception as e: print(f"Error di loop Penghapusan: {e} pada item {item.pk}")
-    # -- DEBUG PRINT 5 --
-    print(f"Jumlah Final sebelum sort: {len(all_rencana)}")
-
+    # Urutkan hasil akhir
     all_rencana.sort(key=lambda x: (x.barang.kode_barang, x.barang.nup, x.tahun_rencana))
-    context = {'page_title': 'Daftar Rencana Pengelolaan (Perubahan/Pembatalan)', 'all_rencana': all_rencana}
+
+    # --- TAMBAHKAN PAGINATION ---
+    paginator = Paginator(all_rencana, 25) # Tampilkan 25 rencana per halaman
+    page_number = request.GET.get('page') # Ambil nomor halaman dari URL (?page=...)
+    try:
+        page_obj = paginator.get_page(page_number) # Dapatkan objek halaman
+    except PageNotAnInteger:
+        # Jika page bukan integer, tampilkan halaman pertama.
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        # Jika page di luar range (misal 9999), tampilkan halaman terakhir.
+        page_obj = paginator.page(paginator.num_pages)
+    # --- AKHIR PAGINATION ---
+
+    context = {
+        'page_title': 'Daftar Rencana Pengelolaan (Perubahan/Pembatalan)',
+        'page_obj': page_obj, # Kirim page_obj ke template
+        'tahun_options': tahun_options,
+        'jenis_options': jenis_options,
+        'selected_tahun': tahun_filter,
+        'selected_jenis': jenis_filter,
+        'request_get_params': request.GET.urlencode() # Untuk pagination link
+    }
     return render(request, 'rencana_bmn/daftar_semua_rencana.html', context)
+
+# @login_required
+# def daftar_semua_rencana(request):
+#     # --- KODE TES UNTUK DEBUG ---
+#     print("--- MULAI EKSEKUSI VIEW daftar_semua_rencana (VERSI TES) ---")
+
+#     # Buat data dummy
+#     try:
+#         # Kita butuh ContentType asli untuk link di template
+#         ct_penggunaan_id = ContentType.objects.get_for_model(RencanaPenggunaan).id
+#         ct_pemanfaatan_id = ContentType.objects.get_for_model(RencanaPemanfaatan).id
+#     except Exception as e:
+#         print(f"Error saat get ContentType: {e}")
+#         ct_penggunaan_id = 0
+#         ct_pemanfaatan_id = 0
+
+#     dummy_barang = SimpleNamespace(kode_barang="DUMMY01", uraian_barang="Barang Tes", nup=1)
+#     dummy_rencana_1 = SimpleNamespace(
+#         pk=9998, # ID pura-pura
+#         barang=dummy_barang,
+#         tahun_rencana=2025,
+#         jenis_rencana_display="Penggunaan",
+#         jenis_rencana_slug="penggunaan",
+#         detail_spesifik="Tes Sendiri",
+#         content_type_id=ct_penggunaan_id
+#     )
+#     dummy_rencana_2 = SimpleNamespace(
+#          pk=9999, # ID pura-pura
+#         barang=dummy_barang,
+#         tahun_rencana=2026,
+#         jenis_rencana_display="Pemanfaatan",
+#         jenis_rencana_slug="pemanfaatan",
+#         detail_spesifik="Tes Sewa",
+#         content_type_id=ct_pemanfaatan_id
+#     )
+#     test_list = [dummy_rencana_1, dummy_rencana_2]
+#     print(f"--- Mengirim test_list berisi {len(test_list)} item dummy ---")
+
+#     context = {
+#         'page_title': 'Daftar Rencana Pengelolaan (TESTING VIEW)',
+#         'all_rencana': test_list, # Kirim list dummy ini
+#         'tahun_options': [('', 'Semua Tahun'), ('2025', '2025'), ('2026', '2026')],
+#         'jenis_options': [('', 'Semua Jenis'), ('Penggunaan', 'Penggunaan'), ('Pemanfaatan', 'Pemanfaatan')],
+#         'selected_tahun': '',
+#         'selected_jenis': '',
+#     }
+#     print("--- SELESAI EKSEKUSI VIEW daftar_semua_rencana (VERSI TES) ---")
+#     return render(request, 'rencana_bmn/daftar_semua_rencana.html', context)
+#     # --- AKHIR KODE TES ---
 
 # --- Helper Function ---
 def get_rencana_object_and_form(ct_id, obj_id, post_data=None, instance_needed=True):
