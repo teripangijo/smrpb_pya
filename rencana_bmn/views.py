@@ -327,20 +327,52 @@ def hapus_rencana(request, pk, rencana_id, jenis_rencana_slug):
 # === Views untuk Perubahan Rencana ===
 @login_required
 def daftar_semua_rencana(request):
-    """Menampilkan daftar semua rencana dari semua barang untuk fitur perubahan/pembatalan."""
+    print("--- VIEW daftar_semua_rencana DIPANGGIL ---")
     penggunaan = RencanaPenggunaan.objects.select_related('barang').all()
     pemanfaatan = RencanaPemanfaatan.objects.select_related('barang').all()
     pemindahtanganan = RencanaPemindahtanganan.objects.select_related('barang').all()
     penghapusan = RencanaPenghapusan.objects.select_related('barang').all()
+    # -- DEBUG PRINT 1 --
+    print(f"Jumlah Awal: Penggunaan={penggunaan.count()}, Pemanfaatan={pemanfaatan.count()}, Pemindahtanganan={pemindahtanganan.count()}, Penghapusan={penghapusan.count()}")
+
     all_rencana = []
     ct_penggunaan = ContentType.objects.get_for_model(RencanaPenggunaan)
     ct_pemanfaatan = ContentType.objects.get_for_model(RencanaPemanfaatan)
     ct_pemindahtanganan = ContentType.objects.get_for_model(RencanaPemindahtanganan)
     ct_penghapusan = ContentType.objects.get_for_model(RencanaPenghapusan)
-    for item in penggunaan: item.jenis_rencana_display = "Penggunaan"; item.jenis_rencana_slug = "penggunaan"; item.detail_spesifik = item.get_jenis_penggunaan_display(); item.content_type_id = ct_penggunaan.id; all_rencana.append(item)
-    for item in pemanfaatan: item.jenis_rencana_display = "Pemanfaatan"; item.jenis_rencana_slug = "pemanfaatan"; item.detail_spesifik = item.get_jenis_pemanfaatan_display(); item.content_type_id = ct_pemanfaatan.id; all_rencana.append(item)
-    for item in pemindahtanganan: item.jenis_rencana_display = "Pemindahtanganan"; item.jenis_rencana_slug = "pemindahtanganan"; item.detail_spesifik = item.get_jenis_pemindahtanganan_display(); item.content_type_id = ct_pemindahtanganan.id; all_rencana.append(item)
-    for item in penghapusan: item.jenis_rencana_display = "Penghapusan"; item.jenis_rencana_slug = "penghapusan"; detail = item.get_jenis_penghapusan_display(); item.detail_spesifik = detail + (f" ({item.keterangan_sebab_lain})" if item.jenis_penghapusan == 'SEBAB_LAIN' and item.keterangan_sebab_lain else ""); item.content_type_id = ct_penghapusan.id; all_rencana.append(item)
+
+    # Loop Penggunaan
+    for item in penggunaan:
+        try: # Tambah try-except untuk debug error per item
+            item.jenis_rencana_display = "Penggunaan"; item.jenis_rencana_slug = "penggunaan"; item.detail_spesifik = item.get_jenis_penggunaan_display(); item.content_type_id = ct_penggunaan.id; all_rencana.append(item)
+        except Exception as e: print(f"Error di loop Penggunaan: {e} pada item {item.pk}")
+    # -- DEBUG PRINT 2 --
+    print(f"Jumlah setelah Penggunaan: {len(all_rencana)}")
+
+    # Loop Pemanfaatan
+    for item in pemanfaatan:
+        try:
+            item.jenis_rencana_display = "Pemanfaatan"; item.jenis_rencana_slug = "pemanfaatan"; item.detail_spesifik = item.get_jenis_pemanfaatan_display(); item.content_type_id = ct_pemanfaatan.id; all_rencana.append(item)
+        except Exception as e: print(f"Error di loop Pemanfaatan: {e} pada item {item.pk}")
+    # -- DEBUG PRINT 3 --
+    print(f"Jumlah setelah Pemanfaatan: {len(all_rencana)}")
+
+    # Loop Pemindahtanganan
+    for item in pemindahtanganan:
+        try:
+            item.jenis_rencana_display = "Pemindahtanganan"; item.jenis_rencana_slug = "pemindahtanganan"; item.detail_spesifik = item.get_jenis_pemindahtanganan_display(); item.content_type_id = ct_pemindahtanganan.id; all_rencana.append(item)
+        except Exception as e: print(f"Error di loop Pemindahtanganan: {e} pada item {item.pk}")
+    # -- DEBUG PRINT 4 --
+    print(f"Jumlah setelah Pemindahtanganan: {len(all_rencana)}")
+
+    # Loop Penghapusan
+    for item in penghapusan:
+         try:
+            item.jenis_rencana_display = "Penghapusan"; item.jenis_rencana_slug = "penghapusan"; detail = item.get_jenis_penghapusan_display(); item.detail_spesifik = detail + (f" ({item.keterangan_sebab_lain})" if item.jenis_penghapusan == 'SEBAB_LAIN' and item.keterangan_sebab_lain else ""); item.content_type_id = ct_penghapusan.id; all_rencana.append(item)
+         except Exception as e: print(f"Error di loop Penghapusan: {e} pada item {item.pk}")
+    # -- DEBUG PRINT 5 --
+    print(f"Jumlah Final sebelum sort: {len(all_rencana)}")
+
     all_rencana.sort(key=lambda x: (x.barang.kode_barang, x.barang.nup, x.tahun_rencana))
     context = {'page_title': 'Daftar Rencana Pengelolaan (Perubahan/Pembatalan)', 'all_rencana': all_rencana}
     return render(request, 'rencana_bmn/daftar_semua_rencana.html', context)
