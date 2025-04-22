@@ -2,7 +2,7 @@
 # File ini berisi semua definisi Form Django untuk aplikasi rencana_bmn
 
 from django import forms
-from django.urls import reverse # Diperlukan jika masih ada sisa penggunaan di widget
+from django.urls import reverse
 from django.utils import timezone
 from .models import (
     BarangBMN,
@@ -11,6 +11,9 @@ from .models import (
     RencanaPemindahtanganan,
     RencanaPenghapusan,
 )
+
+# Ambil tahun berjalan sekali untuk widget/validasi form
+current_year = timezone.now().year
 
 # 1. Form untuk CRUD Barang BMN
 class BarangBMNForm(forms.ModelForm):
@@ -25,7 +28,7 @@ class BarangBMNForm(forms.ModelForm):
             'uraian_barang': forms.Textarea(attrs={'rows': 3}),
             'nilai_perolehan': forms.NumberInput(attrs={'step': '0.01'}),
             'tahun_perolehan': forms.NumberInput(attrs={'min': 1900, 'max': 2100}),
-            'masa_manfaat_standar': forms.NumberInput(attrs={'min': 1}),
+            'masa_manfaat_standar': forms.NumberInput(attrs={'min': 0}), # Perbolehkan 0
         }
         labels = {
             'nup': 'NUP (Nomor Urut Pendaftaran)',
@@ -49,59 +52,73 @@ class PilihRencanaForm(forms.Form):
         ('PENGGUNAAN', 'Penggunaan'),
         ('PEMANFAATAN', 'Pemanfaatan'),
         ('PEMINDAHTANGANAN', 'Pemindahtanganan'),
-        ('PENGHAPUSAN', 'Penghapusan (Sebab Lain)'), # Hanya Sebab Lain untuk manual
+        ('PENGHAPUSAN', 'Penghapusan (Sebab Lain)'),
     ]
     jenis_rencana = forms.ChoiceField(
         label="Jenis Rencana",
         choices=JENIS_RENCANA_CHOICES,
         widget=forms.Select(attrs={
             'class': 'form-select form-select-sm',
-            # Atribut HTMX dipindah ke template detail_barang.html
-            'id':'id_jenis_rencana_selector' # Beri ID eksplisit
+            'id':'id_jenis_rencana_selector'
             })
     )
 
 # 3. Forms Spesifik per Jenis Rencana (untuk Penambahan Individual / Perubahan)
+#    Sekarang menyertakan 'tahun_rencana' di fields
 class RencanaPenggunaanForm(forms.ModelForm):
     """Form untuk detail Rencana Penggunaan."""
     class Meta:
         model = RencanaPenggunaan
-        fields = ['jenis_penggunaan'] # Nanti bisa ditambahkan tahun_rencana jika form perubahan butuh
+        fields = ['tahun_rencana', 'jenis_penggunaan'] # <-- 'tahun_rencana' DITAMBAHKAN
         widgets = {
+            'tahun_rencana': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': current_year}),
             'jenis_penggunaan': forms.Select(attrs={'class': 'form-select form-select-sm'}),
         }
-        labels = {'jenis_penggunaan': ''} # Kosongkan label jika sudah jelas
+        labels = {
+            'tahun_rencana': 'Tahun Rencana', # <-- Label ditambahkan
+            'jenis_penggunaan': 'Jenis Penggunaan'
+         }
 
 class RencanaPemanfaatanForm(forms.ModelForm):
     """Form untuk detail Rencana Pemanfaatan."""
     class Meta:
         model = RencanaPemanfaatan
-        fields = ['jenis_pemanfaatan']
+        fields = ['tahun_rencana', 'jenis_pemanfaatan'] # <-- 'tahun_rencana' DITAMBAHKAN
         widgets = {
+            'tahun_rencana': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': current_year}),
             'jenis_pemanfaatan': forms.Select(attrs={'class': 'form-select form-select-sm'}),
         }
-        labels = {'jenis_pemanfaatan': ''}
+        labels = {
+            'tahun_rencana': 'Tahun Rencana', # <-- Label ditambahkan
+            'jenis_pemanfaatan': 'Jenis Pemanfaatan'
+        }
 
 class RencanaPemindahtangananForm(forms.ModelForm):
     """Form untuk detail Rencana Pemindahtanganan."""
     class Meta:
         model = RencanaPemindahtanganan
-        fields = ['jenis_pemindahtanganan']
+        fields = ['tahun_rencana', 'jenis_pemindahtanganan'] # <-- 'tahun_rencana' DITAMBAHKAN
         widgets = {
+            'tahun_rencana': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': current_year}),
             'jenis_pemindahtanganan': forms.Select(attrs={'class': 'form-select form-select-sm'}),
         }
-        labels = {'jenis_pemindahtanganan': ''}
+        labels = {
+            'tahun_rencana': 'Tahun Rencana', # <-- Label ditambahkan
+            'jenis_pemindahtanganan': 'Jenis Pemindahtanganan'
+        }
 
 class RencanaPenghapusanForm(forms.ModelForm):
     """Form untuk detail Rencana Penghapusan (fokus input manual 'Sebab Lain')."""
     class Meta:
         model = RencanaPenghapusan
-        fields = ['jenis_penghapusan', 'keterangan_sebab_lain']
+        fields = ['tahun_rencana', 'jenis_penghapusan', 'keterangan_sebab_lain'] # <-- 'tahun_rencana' DITAMBAHKAN
         widgets = {
+            'tahun_rencana': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': current_year}),
             'jenis_penghapusan': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'keterangan_sebab_lain': forms.Textarea(attrs={'rows': 2, 'class': 'form-control form-control-sm'}),
         }
         labels = {
+            'tahun_rencana': 'Tahun Rencana', # <-- Label ditambahkan
             'jenis_penghapusan': 'Alasan Penghapusan Manual',
             'keterangan_sebab_lain': 'Keterangan (jika Sebab Lain)',
          }
@@ -122,9 +139,8 @@ class RencanaPenghapusanForm(forms.ModelForm):
         if jenis == 'SEBAB_LAIN' and not keterangan:
             self.add_error('keterangan_sebab_lain', 'Keterangan wajib diisi.')
         elif jenis != 'SEBAB_LAIN' and keterangan:
-             cleaned_data['keterangan_sebab_lain'] = '' # Kosongkan jika bukan sebab lain
+             cleaned_data['keterangan_sebab_lain'] = ''
 
-        # Pastikan tidak bisa memilih jenis pemindahtanganan scr manual
         if jenis in [p[0] for p in RencanaPemindahtanganan.JENIS_PEMINDAHTANGANAN_CHOICES]:
              self.add_error('jenis_penghapusan', 'Jenis ini otomatis dari Rencana Pemindahtanganan.')
 
@@ -146,7 +162,7 @@ class ImportExcelForm(forms.Form):
     excel_file = forms.FileField(
         label="Pilih File Excel (.xlsx)",
         required=True,
-        widget=forms.ClearableFileInput(attrs={'accept': '.xlsx'}) # Batasi hanya .xlsx
+        widget=forms.ClearableFileInput(attrs={'accept': '.xlsx'})
     )
 
 # 6. Form untuk Definisi Rencana Bulk
@@ -156,13 +172,10 @@ class BulkRencanaForm(forms.Form):
         label="Tahun Rencana", choices=[], # Diisi di view
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    # Gunakan choices dari PilihRencanaForm agar konsisten
     jenis_rencana = forms.ChoiceField(
         label="Jenis Rencana", choices=PilihRencanaForm.JENIS_RENCANA_CHOICES, required=True,
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_bulk_jenis_rencana'})
     )
-
-    # Field untuk detail spesifik (awalnya tidak required)
     jenis_penggunaan = forms.ChoiceField(
         label="Jenis Penggunaan", choices=RencanaPenggunaan.JENIS_PENGGUNAAN_CHOICES, required=False,
         widget=forms.Select(attrs={'class': 'form-select detail-field', 'data_jenis': 'PENGGUNAAN'})
@@ -175,7 +188,7 @@ class BulkRencanaForm(forms.Form):
         label="Jenis Pemindahtanganan", choices=RencanaPemindahtanganan.JENIS_PEMINDAHTANGANAN_CHOICES, required=False,
         widget=forms.Select(attrs={'class': 'form-select detail-field', 'data_jenis': 'PEMINDAHTANGANAN'})
     )
-    jenis_penghapusan = forms.ChoiceField( # Hanya Sebab Lain untuk bulk
+    jenis_penghapusan = forms.ChoiceField(
         label="Alasan Penghapusan Manual", choices=[('', '---------'),('SEBAB_LAIN', 'Sebab-Sebab Lain')], required=False,
         widget=forms.Select(attrs={'class': 'form-select detail-field', 'data_jenis': 'PENGHAPUSAN'})
     )
@@ -185,31 +198,21 @@ class BulkRencanaForm(forms.Form):
     )
 
     def clean(self):
+        # ... (method clean untuk BulkRencanaForm tetap sama) ...
         cleaned_data = super().clean()
         jenis_rencana = cleaned_data.get('jenis_rencana')
-
-        # Validasi field detail spesifik wajib diisi berdasarkan jenis_rencana
         detail_field_name = None
-        is_required = True # Defaultnya required jika jenis dipilih
-
+        is_required = True
         if jenis_rencana == 'PENGGUNAAN': detail_field_name = 'jenis_penggunaan'
         elif jenis_rencana == 'PEMANFAATAN': detail_field_name = 'jenis_pemanfaatan'
         elif jenis_rencana == 'PEMINDAHTANGANAN': detail_field_name = 'jenis_pemindahtanganan'
         elif jenis_rencana == 'PENGHAPUSAN':
             detail_field_name = 'jenis_penghapusan'
-            # Jika jenis penghapusan adalah Sebab Lain, keterangan jadi wajib
             if cleaned_data.get(detail_field_name) == 'SEBAB_LAIN' and not cleaned_data.get('keterangan_sebab_lain'):
                 self.add_error('keterangan_sebab_lain', 'Keterangan wajib diisi untuk Sebab Lain.')
-            elif cleaned_data.get(detail_field_name) != 'SEBAB_LAIN':
-                 # Jika jenis penghapusan bukan Sebab Lain (misal kosong), keterangan tidak masalah
-                 pass
-        else:
-            # Jika jenis rencana utama tidak dipilih, detail tidak required
-             is_required = False
-
-
+            elif cleaned_data.get(detail_field_name) != 'SEBAB_LAIN': pass
+        else: is_required = False
         if is_required and detail_field_name and not cleaned_data.get(detail_field_name):
             field_label = self.fields[detail_field_name].label
             self.add_error(detail_field_name, f'{field_label} wajib dipilih untuk jenis rencana ini.')
-
         return cleaned_data
