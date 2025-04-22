@@ -131,7 +131,21 @@
     </p>
     <div class="table-responsive">
         <table class="table table-striped table-hover table-bordered table-sm">
-            {# ... (thead tabel tetap sama) ... #}
+            <thead class="table-secondary">
+                <tr>
+                    <th rowspan="2" class="align-middle text-center">No.</th>
+                    <th colspan="3" class="text-center">Barang BMN</th>
+                    <th rowspan="2" class="align-middle text-center">Tahun Rencana</th>
+                    <th rowspan="2" class="align-middle">Jenis Rencana</th>
+                    <th rowspan="2" class="align-middle">Detail Spesifik</th>
+                    <th rowspan="2" class="align-middle text-center">Aksi</th>
+                </tr>
+                <tr>
+                    <th>Kode Barang</th>
+                    <th>Uraian Barang</th>
+                    <th class="text-center">NUP</th>
+                </tr>
+            </thead>
             <tbody>
                 {# Loop menggunakan page_obj #}
                 {% for rencana in page_obj %}
